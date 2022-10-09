@@ -19,20 +19,11 @@ const void *rabe_deserialize_pub_key(const char *json);
 
 const void *rabe_deserialize_master_key(const char *json);
 
-const void *rabe_deserialize_secret_key(const char *json);
+char *rabe_master_key_to_json(const void *sec_key);
 
-const void *rabe_deserialize_ciphertext(const char *json);
+char *rabe_pub_key_to_json(const void *pub_key);
 
-const void *rabe_generate_sec_key(const void *master_key,
-                                  const char *const *attr,
-                                  uintptr_t attr_len);
-
-const void *rabe_encrypt(const void *pub_key,
-                         const char *policy,
-                         const char *text,
-                         uintptr_t text_length);
-
-struct DecryptResult rabe_decrypt(const void *cipher, const void *sec_key);
+void rabe_free_json(char *json);
 
 void rabe_free_decrypt_result(struct DecryptResult result);
 
@@ -42,16 +33,47 @@ void rabe_free_pub_key(const void *pub_key);
 
 void rabe_free_master_key(const void *master_key);
 
-void rabe_free_sec_key(const void *sec_key);
+const void *rabe_deserialize_cp_sec_key(const char *json);
 
-void rabe_free_cipher(const void *cipher);
+const void *rabe_deserialize_cp_cipher(const char *json);
 
-char *rabe_master_key_to_json(const void *sec_key);
+const void *rabe_generate_cp_sec_key(const void *master_key,
+                                     const char *const *attr,
+                                     uintptr_t attr_len);
 
-char *rabe_pub_key_to_json(const void *pub_key);
+const void *rabe_cp_encrypt(const void *pub_key,
+                            const char *policy,
+                            const char *text,
+                            uintptr_t text_length);
 
-char *rabe_sec_key_to_json(const void *sec_key);
+struct DecryptResult rabe_cp_decrypt(const void *cipher, const void *sec_key);
 
-char *rabe_cipher_to_json(const void *cipher);
+void rabe_free_cp_sec_key(const void *sec_key);
 
-void rabe_free_json(char *json);
+void rabe_free_cp_cipher(const void *cipher);
+
+char *rabe_cp_sec_key_to_json(const void *sec_key);
+
+char *rabe_cp_cipher_to_json(const void *cipher);
+
+const void *rabe_deserialize_kp_sec_key(const char *json);
+
+const void *rabe_deserialize_kp_cipher(const char *json);
+
+const void *rabe_generate_kp_sec_key(const void *master_key, const char *policy);
+
+const void *rabe_kp_encrypt(const void *pub_key,
+                            const char *const *attr,
+                            uintptr_t attr_len,
+                            const char *text,
+                            uintptr_t text_length);
+
+struct DecryptResult rabe_kp_decrypt(const void *cipher, const void *sec_key);
+
+void rabe_free_kp_sec_key(const void *sec_key);
+
+void rabe_free_kp_cipher(const void *cipher);
+
+char *rabe_kp_sec_key_to_json(const void *sec_key);
+
+char *rabe_kp_cipher_to_json(const void *cipher);

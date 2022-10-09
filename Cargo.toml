@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 rabe = "0.2.6"
 serde = "1.0.118"
 serde_json = "1.0.60"
-libc = "0.2.119"
+libc = "0.2.134"
 
 [profile.release]
 opt-level = 3
