@@ -1,77 +1,107 @@
 use std::ffi::{c_char, c_uchar, c_void, CStr, CString};
-use rabe::schemes::ac17;
-use rabe::schemes::ac17::{Ac17MasterKey, Ac17PublicKey};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 #[repr(C)]
-pub struct InitKeyResult {
-    pub pub_key: *const c_void,
-    pub master_key: *const c_void,
-}
-#[repr(C)]
-pub struct DecryptResult {
+pub struct CBoxedBuffer {
     pub(crate) buffer: *const c_uchar,
     pub(crate) len: usize,
 }
 
-
-#[no_mangle]
-pub unsafe extern "C" fn rabe_init() -> InitKeyResult {
-    let (pub_key, master_key) = ac17::setup();
-    InitKeyResult {
-        pub_key: Box::into_raw(Box::new(pub_key)) as *const c_void,
-        master_key: Box::into_raw(Box::new(master_key)) as *const c_void,
+impl Default for CBoxedBuffer {
+    fn default() -> Self {
+        CBoxedBuffer::null()
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn rabe_deserialize_pub_key(json: *const c_char) -> *const c_void{
-    let pub_key = serde_json::from_slice::<Ac17PublicKey>(CStr::from_ptr(json).to_bytes()).unwrap();
-    Box::into_raw(Box::new(pub_key)) as *const c_void
+impl CBoxedBuffer {
+    pub fn null() -> Self {
+        Self {
+            buffer: std::ptr::null(),
+            len: 0,
+        }
+    }
 }
+
+pub(crate) unsafe fn object_ptr_to_json<T: Serialize>(ptr: *const c_void) -> *mut c_char {
+    let value = (ptr as *const T).as_ref();
+    if let Some(value) = value {
+        let json = serde_json::to_string(value);
+        if let Ok(json) = json {
+            CString::from_vec_unchecked(json.into_bytes()).into_raw()
+        } else {
+            std::ptr::null_mut()
+        }
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+pub(crate) unsafe fn json_to_object_ptr<T: DeserializeOwned>(json: *const c_char) -> *const c_void {
+    let object = serde_json::from_slice::<T>(CStr::from_ptr(json).to_bytes());
+    match object {
+        Ok(object) => Box::into_raw(Box::new(object)) as *const c_void,
+        Err(_) => std::ptr::null(),
+    }
+}
+
+pub(crate) unsafe fn cstring_array_to_string_vec(array: *const *const c_char, len: usize) -> Vec<String> {
+    (0..len).map(|index| {
+        let c_str_ptr = array.add(index).read();
+        CStr::from_ptr(c_str_ptr).to_string_lossy().to_string()
+    }).collect::<Vec<_>>()
+}
+
+
+pub(crate) unsafe fn vec_u8_to_cboxedbuffer(mut array: Vec<u8>) -> CBoxedBuffer {
+    array.shrink_to_fit();
+    let len = array.len();
+    let text_ptr = array.as_ptr();
+    std::mem::forget(array);
+    CBoxedBuffer { buffer: text_ptr, len }
+}
+
+
 #[no_mangle]
-pub unsafe extern "C" fn rabe_deserialize_master_key(json: *const c_char) -> *const c_void{
-    let master_key = serde_json::from_slice::<Ac17MasterKey>(CStr::from_ptr(json).to_bytes()).unwrap();
-    Box::into_raw(Box::new(master_key)) as *const c_void
+pub unsafe extern "C" fn rabe_free_json(json: *mut c_char) {
+    let _ = Box::from_raw(json);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_master_key_to_json(sec_key: *const c_void) -> *mut c_char {
-    let sec_key = (sec_key as *const Ac17MasterKey).as_ref().unwrap();
-    let json = serde_json::to_string(sec_key).unwrap();
-    CString::from_vec_unchecked(json.into_bytes()).into_raw()
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn rabe_pub_key_to_json(pub_key: *const c_void) -> *mut c_char {
-    let pub_key = (pub_key as *const Ac17PublicKey).as_ref().unwrap();
-    let json = serde_json::to_string(pub_key).unwrap();
-    CString::from_vec_unchecked(json.into_bytes()).into_raw()
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn rabe_free_json(json: *mut c_char){
-    let _ = Box::<u8>::from_raw(json as *mut u8);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn rabe_free_decrypt_result(result: DecryptResult) {
+pub unsafe extern "C" fn rabe_free_boxed_buffer(result: CBoxedBuffer) {
     let _ = Vec::from_raw_parts(result.buffer as *mut u8, result.len, result.len);
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn rabe_free_init_result(result: InitKeyResult) {
-    let _ = Box::from_raw(result.pub_key as *mut Ac17PublicKey);
-    let _ = Box::from_raw(result.master_key as *mut Ac17MasterKey);
+#[macro_export]
+macro_rules! to_json_impl {
+    ($($name:ident,$t:ty),*) => {
+        $(
+            #[no_mangle]
+            pub unsafe extern "C" fn $name(ptr: *const c_void) -> *mut c_char {
+                object_ptr_to_json::<$t>(ptr)
+            }
+        )*
+    };
 }
-
-#[no_mangle]
-pub unsafe extern "C" fn rabe_free_pub_key(pub_key: *const c_void) {
-    let _ = Box::<Ac17PublicKey>::from_raw(pub_key as *mut Ac17PublicKey);
+#[macro_export]
+macro_rules! from_json_impl {
+    ($($name:ident,$t:ty),*) => {
+        $(
+            #[no_mangle]
+            pub unsafe extern "C" fn $name(json: *const c_char) -> *const c_void {
+                json_to_object_ptr::<$t>(json)
+            }
+        )*
+    };
 }
-
-#[no_mangle]
-pub unsafe extern "C" fn rabe_free_master_key(master_key: *const c_void) {
-    let _ = Box::<Ac17MasterKey>::from_raw(master_key as *mut Ac17MasterKey);
+#[macro_export]
+macro_rules! free_impl {
+    ($($name:ident,$t:ty),*) => {
+        $(
+            #[no_mangle]
+            pub unsafe extern "C" fn $name(ptr: *const c_void){
+                let _ = Box::from_raw(ptr as *mut $t);
+            }
+        )*
+    };
 }
-
-
