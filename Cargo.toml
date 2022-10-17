@@ -21,7 +21,6 @@ lto = true
 rpath = false
 debug-assertions = false
 panic = 'abort'
-split-debuginfo = 'off'
 debug = false
 
 [build-dependencies]
