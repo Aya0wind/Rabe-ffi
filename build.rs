@@ -12,5 +12,5 @@ fn main() {
         .with_language(Language::C)
         .generate()
         .expect("Unable to generate bindings")
-        .write_to_file("bindings.h");
+        .write_to_file("rabe.h");
 }
