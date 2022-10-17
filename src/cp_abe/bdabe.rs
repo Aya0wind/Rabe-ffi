@@ -46,7 +46,7 @@ pub unsafe extern "C" fn rabe_cp_bdabe_init() -> BdabeSetupResult {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_bdabe_generate_sec_auth_key(
+pub unsafe extern "C" fn rabe_cp_bdabe_generate_secret_authority_key(
     public_key: *const c_void,
     master_key: *const c_void,
     name: *const c_char) -> *const c_void {
@@ -66,15 +66,15 @@ pub unsafe extern "C" fn rabe_cp_bdabe_generate_sec_auth_key(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_bdabe_generate_sec_attr_key(
-    pub_user_key: *const c_void,
-    sec_auth_key: *const c_void,
+pub unsafe extern "C" fn rabe_cp_bdabe_generate_secret_attribute_key(
+    public_user_key: *const c_void,
+    secret_authority_key: *const c_void,
     attr: *const c_char) -> *const c_void {
-    let pub_user_key = (pub_user_key as *const BdabePublicUserKey).as_ref();
-    let sec_auth_key = (sec_auth_key as *const BdabeSecretAuthorityKey).as_ref();
-    if let (Some(pub_user_key), Some(sec_auth_key)) = (pub_user_key, sec_auth_key) {
+    let public_user_key = (public_user_key as *const BdabePublicUserKey).as_ref();
+    let secret_authority_key = (secret_authority_key as *const BdabeSecretAuthorityKey).as_ref();
+    if let (Some(public_user_key), Some(secret_authority_key)) = (public_user_key, secret_authority_key) {
         let attr = CStr::from_ptr(attr).to_string_lossy().to_string();
-        let key = request_attribute_sk(pub_user_key, sec_auth_key, &attr);
+        let key = request_attribute_sk(public_user_key, secret_authority_key, &attr);
         if let Ok(key) = key {
             Box::into_raw(Box::new(key)) as *const c_void
         } else {
@@ -89,14 +89,14 @@ pub unsafe extern "C" fn rabe_cp_bdabe_generate_sec_attr_key(
 #[no_mangle]
 pub unsafe extern "C" fn rabe_cp_bdabe_generate_user_key(
     public_key: *const c_void,
-    sec_auth_key: *const c_void,
+    secret_authority_key: *const c_void,
     name: *const c_char,
 ) -> *const c_void {
     let public_key = (public_key as *const BdabePublicKey).as_ref();
-    let sec_auth_key = (sec_auth_key as *const BdabeSecretAuthorityKey).as_ref();
-    if let (Some(public_key), Some(sec_auth_key)) = (public_key, sec_auth_key) {
+    let secret_authority_key = (secret_authority_key as *const BdabeSecretAuthorityKey).as_ref();
+    if let (Some(public_key), Some(secret_authority_key)) = (public_key, secret_authority_key) {
         let name = CStr::from_ptr(name).to_string_lossy().to_string();
-        let key = keygen(public_key, sec_auth_key, &name);
+        let key = keygen(public_key, secret_authority_key, &name);
         Box::into_raw(Box::new(key)) as *const c_void
     } else {
         null()
@@ -104,16 +104,16 @@ pub unsafe extern "C" fn rabe_cp_bdabe_generate_user_key(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_bdabe_generate_pub_attr_key(
+pub unsafe extern "C" fn rabe_cp_bdabe_generate_public_attribute_key(
     public_key: *const c_void,
-    sec_auth_key: *const c_void,
+    secret_authority_key: *const c_void,
     name: *const c_char,
 ) -> *const c_void {
     let public_key = (public_key as *const BdabePublicKey).as_ref();
-    let sec_auth_key = (sec_auth_key as *const BdabeSecretAuthorityKey).as_ref();
-    if let (Some(public_key), Some(sec_auth_key)) = (public_key, sec_auth_key) {
+    let secret_authority_key = (secret_authority_key as *const BdabeSecretAuthorityKey).as_ref();
+    if let (Some(public_key), Some(secret_authority_key)) = (public_key, secret_authority_key) {
         let name = CStr::from_ptr(name).to_string_lossy().to_string();
-        let key = request_attribute_pk(public_key, sec_auth_key, &name);
+        let key = request_attribute_pk(public_key, secret_authority_key, &name);
         if let Ok(key) = key {
             Box::into_raw(Box::new(key)) as *const c_void
         } else {
@@ -125,16 +125,16 @@ pub unsafe extern "C" fn rabe_cp_bdabe_generate_pub_attr_key(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_bdabe_add_attr_to_user_key(
-    sec_auth_key: *const c_void,
+pub unsafe extern "C" fn rabe_cp_bdabe_add_attribute_to_user_key(
+    secret_authority_key: *const c_void,
     user_key: *const c_void,
     attr: *const c_char,
 ) -> c_int {
-    let sec_auth_key = (sec_auth_key as *const BdabeSecretAuthorityKey).as_ref();
-    if let Some(sec_auth_key) = sec_auth_key {
+    let secret_authority_key = (secret_authority_key as *const BdabeSecretAuthorityKey).as_ref();
+    if let Some(secret_authority_key) = secret_authority_key {
         let attr = CStr::from_ptr(attr).to_string_lossy().to_string();
         if let Some(user_key) = (user_key as *mut BdabeUserKey).as_mut() {
-            user_key._ska.push(request_attribute_sk(&user_key._pk, sec_auth_key, &attr).unwrap());
+            user_key._ska.push(request_attribute_sk(&user_key._pk, secret_authority_key, &attr).unwrap());
             return 0;
         }
     }
@@ -144,8 +144,8 @@ pub unsafe extern "C" fn rabe_cp_bdabe_add_attr_to_user_key(
 #[no_mangle]
 pub unsafe extern "C" fn rabe_cp_bdabe_encrypt(
     public_key: *const c_void,
-    pub_attr_keys: *const *const c_void,
-    pub_attr_keys_len: usize,
+    public_attribute_keys: *const *const c_void,
+    public_attribute_keys_len: usize,
     policy: *const c_char,
     text: *const c_char,
     text_length: usize) -> *const c_void {
@@ -153,20 +153,20 @@ pub unsafe extern "C" fn rabe_cp_bdabe_encrypt(
     if let Some(public_key) = public_key {
         let policy_len = libc::strlen(policy);
         let policy = String::from_raw_parts(policy as *mut u8, policy_len, policy_len);
-        let pub_attr_keys = std::slice::from_raw_parts(pub_attr_keys, pub_attr_keys_len)
+        let public_attribute_keys = std::slice::from_raw_parts(public_attribute_keys, public_attribute_keys_len)
             .iter()
             .map(|x| (*x as *mut BdabePublicAttributeKey).read())
             .collect::<Vec<_>>();
         let cipher = encrypt(
             public_key,
-            &pub_attr_keys,
+            &public_attribute_keys,
             &policy,
             std::slice::from_raw_parts(text as *const u8, text_length),
             PolicyLanguage::HumanPolicy,
         );
         std::mem::forget(policy);
-        let _ = Vec::from_raw_parts(pub_attr_keys.as_ptr() as *mut *const c_void, pub_attr_keys.len(), pub_attr_keys.capacity());
-        std::mem::forget(pub_attr_keys);
+        let _ = Vec::from_raw_parts(public_attribute_keys.as_ptr() as *mut *const c_void, public_attribute_keys.len(), public_attribute_keys.capacity());
+        std::mem::forget(public_attribute_keys);
         if let Ok(cipher) = cipher {
             Box::into_raw(Box::new(cipher)) as *const c_void
         } else {
@@ -239,7 +239,7 @@ mod test {
     use libc::c_char;
 
     use crate::common::{rabe_free_boxed_buffer, rabe_free_json};
-    use crate::cp_abe::bdabe::{rabe_cp_bdabe_add_attr_to_user_key, rabe_cp_bdabe_ciphertext_from_json, rabe_cp_bdabe_ciphertext_to_json, rabe_cp_bdabe_decrypt, rabe_cp_bdabe_encrypt, rabe_cp_bdabe_free_ciphertext, rabe_cp_bdabe_free_master_key, rabe_cp_bdabe_free_public_attribute_key, rabe_cp_bdabe_free_public_key, rabe_cp_bdabe_free_secret_authority_key, rabe_cp_bdabe_free_user_key, rabe_cp_bdabe_generate_pub_attr_key, rabe_cp_bdabe_generate_sec_auth_key, rabe_cp_bdabe_generate_user_key, rabe_cp_bdabe_init, rabe_cp_bdabe_master_key_from_json, rabe_cp_bdabe_master_key_to_json, rabe_cp_bdabe_public_attribute_key_from_json, rabe_cp_bdabe_public_attribute_key_to_json, rabe_cp_bdabe_public_key_from_json, rabe_cp_bdabe_public_key_to_json, rabe_cp_bdabe_secret_authority_key_from_json, rabe_cp_bdabe_secret_authority_key_to_json, rabe_cp_bdabe_user_key_from_json, rabe_cp_bdabe_user_key_to_json};
+    use crate::cp_abe::bdabe::{rabe_cp_bdabe_add_attribute_to_user_key, rabe_cp_bdabe_ciphertext_from_json, rabe_cp_bdabe_ciphertext_to_json, rabe_cp_bdabe_decrypt, rabe_cp_bdabe_encrypt, rabe_cp_bdabe_free_ciphertext, rabe_cp_bdabe_free_master_key, rabe_cp_bdabe_free_public_attribute_key, rabe_cp_bdabe_free_public_key, rabe_cp_bdabe_free_secret_authority_key, rabe_cp_bdabe_free_user_key, rabe_cp_bdabe_generate_public_attribute_key, rabe_cp_bdabe_generate_secret_authority_key, rabe_cp_bdabe_generate_user_key, rabe_cp_bdabe_init, rabe_cp_bdabe_master_key_from_json, rabe_cp_bdabe_master_key_to_json, rabe_cp_bdabe_public_attribute_key_from_json, rabe_cp_bdabe_public_attribute_key_to_json, rabe_cp_bdabe_public_key_from_json, rabe_cp_bdabe_public_key_to_json, rabe_cp_bdabe_secret_authority_key_from_json, rabe_cp_bdabe_secret_authority_key_to_json, rabe_cp_bdabe_user_key_from_json, rabe_cp_bdabe_user_key_to_json};
 
     #[test]
     fn test() {
@@ -283,22 +283,22 @@ mod test {
 
             //generate authority key
             let name = CString::new("aa1").unwrap();
-            let sec_auth_key = rabe_cp_bdabe_generate_sec_auth_key(public_key, master_key, name.as_ptr());
-            assert!(!sec_auth_key.is_null());
+            let secret_authority_key = rabe_cp_bdabe_generate_secret_authority_key(public_key, master_key, name.as_ptr());
+            assert!(!secret_authority_key.is_null());
 
             // generate user key
             let user_key = rabe_cp_bdabe_generate_user_key(
                 public_key,
-                sec_auth_key,
+                secret_authority_key,
                 name.as_ptr(),
             );
             assert!(!user_key.is_null());
 
             //serialize and deserialize user key test
-            let json = rabe_cp_bdabe_secret_authority_key_to_json(sec_auth_key);
+            let json = rabe_cp_bdabe_secret_authority_key_to_json(secret_authority_key);
             println!("{}", std::ffi::CStr::from_ptr(json).to_str().unwrap());
-            rabe_cp_bdabe_free_secret_authority_key(sec_auth_key);
-            let sec_auth_key = rabe_cp_bdabe_secret_authority_key_from_json(json);
+            rabe_cp_bdabe_free_secret_authority_key(secret_authority_key);
+            let secret_authority_key = rabe_cp_bdabe_secret_authority_key_from_json(json);
             rabe_free_json(json);
 
             let json = rabe_cp_bdabe_user_key_to_json(user_key);
@@ -310,25 +310,25 @@ mod test {
 
             //generate public attribute key
             let attr = CString::new("aa1::A").unwrap();
-            let pub_attr_key = rabe_cp_bdabe_generate_pub_attr_key(public_key, sec_auth_key, attr.as_ptr());
+            let public_attribute_key = rabe_cp_bdabe_generate_public_attribute_key(public_key, secret_authority_key, attr.as_ptr());
 
             //add attribute key to user key
-            rabe_cp_bdabe_add_attr_to_user_key(sec_auth_key, user_key, attr.as_ptr());
+            rabe_cp_bdabe_add_attribute_to_user_key(secret_authority_key, user_key, attr.as_ptr());
 
             //serialize and deserialize public attribute key test
-            let json = rabe_cp_bdabe_public_attribute_key_to_json(pub_attr_key);
+            let json = rabe_cp_bdabe_public_attribute_key_to_json(public_attribute_key);
             println!("{}", std::ffi::CStr::from_ptr(json).to_str().unwrap());
-            rabe_cp_bdabe_free_public_attribute_key(pub_attr_key);
-            let pub_attr_key = rabe_cp_bdabe_public_attribute_key_from_json(json);
+            rabe_cp_bdabe_free_public_attribute_key(public_attribute_key);
+            let public_attribute_key = rabe_cp_bdabe_public_attribute_key_from_json(json);
             rabe_free_json(json);
 
             //encrypt test
             let _plaintext = String::from("our plaintext!").into_bytes();
             let _policy = CString::new(r#""aa1::A" or "aa1::B""#).unwrap();
-            let pub_attr_keys = vec![pub_attr_key];
+            let public_attribute_keys = vec![public_attribute_key];
             let cipher = rabe_cp_bdabe_encrypt(public_key,
-                                               pub_attr_keys.as_ptr(),
-                                               pub_attr_keys.len(),
+                                               public_attribute_keys.as_ptr(),
+                                               public_attribute_keys.len(),
                                                _policy.as_ptr(),
                                                _plaintext.as_ptr() as *const c_char,
                                                _plaintext.len());
@@ -350,9 +350,9 @@ mod test {
             //free memory
             rabe_cp_bdabe_free_public_key(public_key);
             rabe_cp_bdabe_free_master_key(master_key);
-            rabe_cp_bdabe_free_secret_authority_key(sec_auth_key);
+            rabe_cp_bdabe_free_secret_authority_key(secret_authority_key);
             rabe_cp_bdabe_free_user_key(user_key);
-            rabe_cp_bdabe_free_public_attribute_key(pub_attr_key);
+            rabe_cp_bdabe_free_public_attribute_key(public_attribute_key);
             rabe_cp_bdabe_free_ciphertext(cipher);
         }
     }

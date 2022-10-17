@@ -1,7 +1,7 @@
 extern crate cbindgen;
 
 use std::env;
-use cbindgen::{Language, ParseExpandConfig};
+use cbindgen::{Language};
 
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();

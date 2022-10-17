@@ -47,7 +47,7 @@ pub unsafe extern "C" fn rabe_cp_mke08_init() -> Mke08SetupResult {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_mke08_generate_sec_auth_key(name: *const c_char) -> *const c_void {
+pub unsafe extern "C" fn rabe_cp_mke08_generate_secret_authority_key(name: *const c_char) -> *const c_void {
     let name = CStr::from_ptr(name).to_string_lossy().to_string();
     let key = authgen(&name);
     Box::into_raw(Box::new(key)) as *const c_void
@@ -71,16 +71,16 @@ pub unsafe extern "C" fn rabe_cp_mke08_generate_user_key(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_mke08_add_attr_to_user_key(
-    sec_auth_key: *const c_void,
+pub unsafe extern "C" fn rabe_cp_mke08_add_attribute_to_user_key(
+    secret_authority_key: *const c_void,
     user_key: *const c_void,
     attr: *const c_char,
 ) -> c_int {
-    let sec_auth_key = (sec_auth_key as *const Mke08SecretAuthorityKey).as_ref();
-    if let Some(sec_auth_key) = sec_auth_key {
+    let secret_authority_key = (secret_authority_key as *const Mke08SecretAuthorityKey).as_ref();
+    if let Some(secret_authority_key) = secret_authority_key {
         let attr = CStr::from_ptr(attr).to_string_lossy().to_string();
         if let Some(user_key) = (user_key as *mut Mke08UserKey).as_mut() {
-            user_key._sk_a.push(request_authority_sk(&attr,sec_auth_key,&user_key._pk_u ).unwrap());
+            user_key._sk_a.push(request_authority_sk(&attr,secret_authority_key,&user_key._pk_u ).unwrap());
             return 0;
         }
     }
@@ -91,13 +91,13 @@ pub unsafe extern "C" fn rabe_cp_mke08_add_attr_to_user_key(
 pub unsafe extern "C" fn rabe_cp_mke08_generate_public_attribute_key(
     public_key: *const c_void,
     attr: *const c_char,
-    sec_auth_key: *const c_void,
+    secret_authority_key: *const c_void,
 ) -> *const c_void {
     let public_key = (public_key as *const Mke08PublicKey).as_ref();
-    let sec_auth_key = (sec_auth_key as *const Mke08SecretAuthorityKey).as_ref();
-    if let (Some(public_key), Some(sec_auth_key)) = (public_key, sec_auth_key) {
+    let secret_authority_key = (secret_authority_key as *const Mke08SecretAuthorityKey).as_ref();
+    if let (Some(public_key), Some(secret_authority_key)) = (public_key, secret_authority_key) {
         let attr = CStr::from_ptr(attr).to_string_lossy().to_string();
-        if let Ok(public_attr_user_key) = request_authority_pk(public_key,&attr, sec_auth_key){
+        if let Ok(public_attr_user_key) = request_authority_pk(public_key,&attr, secret_authority_key){
             return Box::into_raw(Box::new(public_attr_user_key)) as *const c_void;
         }
     }
@@ -110,8 +110,8 @@ pub unsafe extern "C" fn rabe_cp_mke08_generate_public_attribute_key(
 #[no_mangle]
 pub unsafe extern "C" fn rabe_cp_mke08_encrypt(
     public_key: *const c_void,
-    pub_attr_keys: *const *const c_void,
-    pub_attr_keys_len: usize,
+    public_attribute_keys: *const *const c_void,
+    public_attribute_keys_len: usize,
     policy: *const c_char,
     text: *const c_char,
     text_length: usize) -> *const c_void {
@@ -119,20 +119,21 @@ pub unsafe extern "C" fn rabe_cp_mke08_encrypt(
     if let Some(public_key) = public_key {
         let policy_len = libc::strlen(policy);
         let policy = String::from_raw_parts(policy as *mut u8, policy_len, policy_len);
-        let pub_attr_keys = std::slice::from_raw_parts(pub_attr_keys, pub_attr_keys_len)
-            .iter()
+        let attr_slice = std::slice::from_raw_parts(public_attribute_keys, public_attribute_keys_len);
+        let public_attribute_keys =
+            attr_slice.iter()
             .map(|x| (*x as *mut Mke08PublicAttributeKey).read())
             .collect::<Vec<_>>();
         let cipher = encrypt(
             public_key,
-            &pub_attr_keys,
+            &public_attribute_keys,
             &policy,
             PolicyLanguage::HumanPolicy,
             std::slice::from_raw_parts(text as *const u8, text_length),
         );
         std::mem::forget(policy);
-        let _ = Vec::from_raw_parts(pub_attr_keys.as_ptr() as *mut *const c_void, pub_attr_keys.len(), pub_attr_keys.capacity());
-        std::mem::forget(pub_attr_keys);
+        let _ = Vec::from_raw_parts(public_attribute_keys.as_ptr() as *mut *const c_void, public_attribute_keys.len(), public_attribute_keys.capacity());
+        std::mem::forget(public_attribute_keys);
         if let Ok(cipher) = cipher {
             Box::into_raw(Box::new(cipher)) as *const c_void
         } else {
@@ -212,8 +213,7 @@ mod test {
     use std::ffi::CString;
 
     use crate::common::{rabe_free_boxed_buffer, rabe_free_json};
-    use crate::cp_abe::bdabe::{rabe_cp_bdabe_add_attr_to_user_key, rabe_cp_bdabe_generate_pub_attr_key};
-    use crate::cp_abe::mke08::{rabe_cp_mke08_add_attr_to_user_key, rabe_cp_mke08_ciphertext_to_json, rabe_cp_mke08_decrypt, rabe_cp_mke08_encrypt, rabe_cp_mke08_free_ciphertext, rabe_cp_mke08_free_master_key, rabe_cp_mke08_free_public_key, rabe_cp_mke08_free_user_key, rabe_cp_mke08_generate_public_attribute_key, rabe_cp_mke08_generate_sec_auth_key, rabe_cp_mke08_generate_user_key, rabe_cp_mke08_init, rabe_cp_mke08_master_key_from_json, rabe_cp_mke08_master_key_to_json, rabe_cp_mke08_public_key_from_json, rabe_cp_mke08_public_key_to_json, rabe_cp_mke08_secret_authority_key_from_json, rabe_cp_mke08_secret_authority_key_to_json, rabe_cp_mke08_user_key_from_json, rabe_cp_mke08_user_key_to_json};
+    use crate::cp_abe::mke08::{rabe_cp_mke08_add_attribute_to_user_key, rabe_cp_mke08_ciphertext_from_json, rabe_cp_mke08_ciphertext_to_json, rabe_cp_mke08_decrypt, rabe_cp_mke08_encrypt, rabe_cp_mke08_free_ciphertext, rabe_cp_mke08_free_master_key, rabe_cp_mke08_free_public_attribute_key, rabe_cp_mke08_free_public_key, rabe_cp_mke08_free_secret_authority_key, rabe_cp_mke08_free_user_key, rabe_cp_mke08_generate_public_attribute_key, rabe_cp_mke08_generate_secret_authority_key, rabe_cp_mke08_generate_user_key, rabe_cp_mke08_init, rabe_cp_mke08_master_key_from_json, rabe_cp_mke08_master_key_to_json, rabe_cp_mke08_public_attribute_key_from_json, rabe_cp_mke08_public_attribute_key_to_json, rabe_cp_mke08_public_key_from_json, rabe_cp_mke08_public_key_to_json, rabe_cp_mke08_secret_authority_key_from_json, rabe_cp_mke08_secret_authority_key_to_json, rabe_cp_mke08_user_key_from_json, rabe_cp_mke08_user_key_to_json};
 
 
     #[test]
@@ -235,7 +235,6 @@ mod test {
             // let _policy = String::from(r#""aa1::A" and "aa2::B""#);
             // let _ct: Mke08Ciphertext = encrypt(&_pk, &vec![_att1_pk, _att2_pk], &_policy, PolicyLanguage::HumanPolicy, &_plaintext).unwrap();
             // assert_eq!(decrypt(&_pk, &_u_key, &_ct).unwrap(), _plaintext);
-
 
             //generate public and master key
             let key = rabe_cp_mke08_init();
@@ -269,40 +268,50 @@ mod test {
             assert!(!user_key.is_null());
             rabe_free_json(user_key_json);
 
-
+            let attr = CString::new("aa1").unwrap();
             //generate secret authority key
-            let auth = rabe_cp_mke08_generate_sec_auth_key(name.as_ptr());
-            assert!(!auth.is_null());
+            let secret_authority_key = rabe_cp_mke08_generate_secret_authority_key(attr.as_ptr());
+            assert!(!secret_authority_key.is_null());
             //serialize and deserialize secret authority key test
-            let auth_json = rabe_cp_mke08_secret_authority_key_to_json(auth);
-            assert!(!auth_json.is_null());
-            rabe_cp_mke08_free_user_key(auth);
-            let auth = rabe_cp_mke08_secret_authority_key_from_json(auth_json);
-            assert!(!auth.is_null());
+            let secret_authority_key_json = rabe_cp_mke08_secret_authority_key_to_json(secret_authority_key);
+            assert!(!secret_authority_key.is_null());
+            rabe_cp_mke08_free_secret_authority_key(secret_authority_key);
+            let secret_authority_key = rabe_cp_mke08_secret_authority_key_from_json(secret_authority_key_json);
+            assert!(!secret_authority_key.is_null());
+            rabe_free_json(secret_authority_key_json);
 
-
-
-            let attr = vec![CString::new("a").unwrap(), CString::new("b").unwrap()];
-            let attr_ptr = attr.iter().map(|s| s.as_ptr()).collect::<Vec<_>>();
-
+            //generate secret authority key1
+            let attr1 = CString::new("aa2").unwrap();
+            let secret_authority_key1 = rabe_cp_mke08_generate_secret_authority_key(attr1.as_ptr());
 
             //generate public attribute key
             let attr = CString::new("aa1::A").unwrap();
-            let pub_attr_key = rabe_cp_mke08_generate_public_attribute_key(public_key, attr.as_ptr(),auth);
+            let public_attribute_key = rabe_cp_mke08_generate_public_attribute_key(public_key, attr.as_ptr(),secret_authority_key);
+            assert!(!public_attribute_key.is_null());
+            //serialize and deserialize public attribute key test
+            let public_attribute_key_json = rabe_cp_mke08_public_attribute_key_to_json(public_attribute_key);
+            assert!(!public_attribute_key_json.is_null());
+            rabe_cp_mke08_free_public_attribute_key(public_attribute_key);
+            let public_attribute_key = rabe_cp_mke08_public_attribute_key_from_json(public_attribute_key_json);
+            assert!(!public_attribute_key.is_null());
+            rabe_free_json(public_attribute_key_json);
 
-            let attr1 = CString::new("aa1::B").unwrap();
-            let pub_attr_key1 = rabe_cp_mke08_generate_public_attribute_key(public_key, attr.as_ptr(),auth);
+
+
+            //generate public attribute key1
+            let attr1 = CString::new("aa2::B").unwrap();
+            let public_attribute_key1 = rabe_cp_mke08_generate_public_attribute_key(public_key, attr1.as_ptr(),secret_authority_key1);
 
             //add attribute key to user key
-            rabe_cp_mke08_add_attr_to_user_key(auth, user_key, attr.as_ptr());
+            rabe_cp_mke08_add_attribute_to_user_key(secret_authority_key, user_key, attr.as_ptr());
 
-            //add attribute key to user key
-            rabe_cp_mke08_add_attr_to_user_key(auth, user_key, attr1.as_ptr());
+            //add attribute key1 to user key
+            rabe_cp_mke08_add_attribute_to_user_key(secret_authority_key1, user_key, attr1.as_ptr());
 
 
             let policy = CString::new(r#""aa1::A" and "aa2::B""#).unwrap();
             let text = CString::new("hello world").unwrap();
-            let public_keys = vec![pub_attr_key,pub_attr_key1];
+            let public_keys = vec![public_attribute_key,public_attribute_key1];
             let cipher = rabe_cp_mke08_encrypt(public_key,
                                                public_keys.as_ptr(),
                                                public_keys.len(),
@@ -310,20 +319,29 @@ mod test {
                                                text.as_ptr(),
                                                "hello world".len());
             assert!(!cipher.is_null());
+            //serialize and deserialize ciphertext test
+            let cipher_json = rabe_cp_mke08_ciphertext_to_json(cipher);
+            assert!(!cipher_json.is_null());
+            rabe_cp_mke08_free_ciphertext(cipher);
+            let cipher = rabe_cp_mke08_ciphertext_from_json(cipher_json);
+            assert!(!cipher.is_null());
+            rabe_free_json(cipher_json);
+
+
             let result = rabe_cp_mke08_decrypt(public_key, user_key,cipher);
             assert!(!result.buffer.is_null());
             assert_eq!(std::slice::from_raw_parts(result.buffer, result.len), "hello world".as_bytes());
-
-            let json = rabe_cp_mke08_public_key_to_json(public_key);
-            println!("{}", std::ffi::CStr::from_ptr(json).to_str().unwrap());
-            rabe_free_json(json);
-            let json = rabe_cp_mke08_ciphertext_to_json(cipher);
-            println!("{}", std::ffi::CStr::from_ptr(json).to_str().unwrap());
-            rabe_free_json(json);
-            rabe_cp_mke08_free_ciphertext(cipher);
             rabe_free_boxed_buffer(result);
+
+            rabe_cp_mke08_free_ciphertext(cipher);
             rabe_cp_mke08_free_public_key(key.public_key);
             rabe_cp_mke08_free_master_key(key.master_key);
+            rabe_cp_mke08_free_user_key(user_key);
+            rabe_cp_mke08_free_secret_authority_key(secret_authority_key);
+            rabe_cp_mke08_free_secret_authority_key(secret_authority_key1);
+            rabe_cp_mke08_free_public_attribute_key(public_attribute_key);
+            rabe_cp_mke08_free_public_attribute_key(public_attribute_key1);
+
         }
     }
 }
