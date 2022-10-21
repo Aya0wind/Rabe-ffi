@@ -5,7 +5,8 @@
 use std::ffi::{c_char, CString};
 use std::ffi::{c_void};
 use std::ptr::null;
-
+use rabe::RabeError;
+use crate::common::THREAD_LAST_ERROR;
 use rabe::schemes::bsw::{
     CpAbeCiphertext,
     CpAbeMasterKey,
@@ -19,7 +20,7 @@ use rabe::schemes::bsw::{
 use rabe::utils::policy::pest::PolicyLanguage;
 
 use crate::common::{CBoxedBuffer, cstring_array_to_string_vec, json_to_object_ptr, object_ptr_to_json, vec_u8_to_cboxedbuffer};
-use crate::{free_impl, from_json_impl, to_json_impl};
+use crate::{free_impl, from_json_impl, set_last_error, to_json_impl};
 
 #[repr(C)]
 pub struct BswSetupResult {
@@ -52,9 +53,11 @@ pub unsafe extern "C" fn rabe_cp_bsw_generate_secret_key(
         if let Some(key) = key {
             Box::into_raw(Box::new(key)) as *const c_void
         } else {
+            set_last_error!("Failed to generate secret key");
             null()
         }
     } else {
+        set_last_error!("Invalid master key or public key");
         null()
     }
 }
@@ -74,12 +77,17 @@ pub unsafe extern "C" fn rabe_cp_bsw_encrypt(public_key: *const c_void, policy: 
         );
         std::mem::forget(policy);
         std::mem::forget(plain_text);
-        if let Ok(cipher) = cipher {
-            Box::into_raw(Box::new(cipher)) as *const c_void
-        } else {
-            null()
+        match cipher {
+            Ok(cipher) => {
+                Box::into_raw(Box::new(cipher)) as *const c_void
+            }
+            Err(err) => {
+                set_last_error!(err);
+                null()
+            }
         }
     } else {
+        set_last_error!("Invalid public key");
         null()
     }
 }
@@ -91,12 +99,17 @@ pub unsafe extern "C" fn rabe_cp_bsw_decrypt(cipher: *const c_void, secret_key: 
     let attr_key = (secret_key as *const CpAbeSecretKey).as_ref();
     if let (Some(cipher), Some(attr_key)) = (cipher, attr_key) {
         let text = decrypt(attr_key, cipher);
-        if let Ok(text) = text {
-            vec_u8_to_cboxedbuffer(text)
-        } else {
-            CBoxedBuffer::null()
+        match text {
+            Ok(text) => {
+                vec_u8_to_cboxedbuffer(text)
+            }
+            Err(err) => {
+                set_last_error!(err);
+                CBoxedBuffer::default()
+            }
         }
     } else {
+        set_last_error!("Invalid cipher or secret key");
         CBoxedBuffer::null()
     }
 }

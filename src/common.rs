@@ -2,6 +2,19 @@ use std::ffi::{c_char, c_uchar, c_void, CStr, CString};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+thread_local! {
+     pub(crate) static THREAD_LAST_ERROR: std::cell::RefCell<CString> =std::cell::RefCell::new(Default::default());
+}
+#[macro_export]
+macro_rules! set_last_error {
+    ($msg:expr) => {
+        THREAD_LAST_ERROR.with(|e| {
+            *e.borrow_mut() = CString::from_vec_unchecked(($msg.to_string().into_bytes()));
+        });
+    };
+}
+
+
 #[repr(C)]
 pub struct CBoxedBuffer {
     pub(crate) buffer: *const c_uchar,
@@ -27,12 +40,17 @@ pub(crate) unsafe fn object_ptr_to_json<T: Serialize>(ptr: *const c_void) -> *mu
     let value = (ptr as *const T).as_ref();
     if let Some(value) = value {
         let json = serde_json::to_string(value);
-        if let Ok(json) = json {
-            CString::from_vec_unchecked(json.into_bytes()).into_raw()
-        } else {
-            std::ptr::null_mut()
+        match json {
+            Ok(json) => {
+                CString::from_vec_unchecked(json.into_bytes()).into_raw()
+            }
+            Err(err) => {
+                set_last_error!(err);
+                std::ptr::null_mut()
+            }
         }
     } else {
+        set_last_error!("Invalid pointer");
         std::ptr::null_mut()
     }
 }
@@ -41,7 +59,10 @@ pub(crate) unsafe fn json_to_object_ptr<T: DeserializeOwned>(json: *const c_char
     let object = serde_json::from_slice::<T>(CStr::from_ptr(json).to_bytes());
     match object {
         Ok(object) => Box::into_raw(Box::new(object)) as *const c_void,
-        Err(_) => std::ptr::null(),
+        Err(err) => {
+            set_last_error!(err);
+            std::ptr::null()
+        },
     }
 }
 
@@ -65,6 +86,14 @@ pub(crate) unsafe fn vec_u8_to_cboxedbuffer(mut array: Vec<u8>) -> CBoxedBuffer 
 #[no_mangle]
 pub unsafe extern "C" fn rabe_free_json(json: *mut c_char) {
     let _ = Box::from_raw(json);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rabe_get_thread_last_error() -> *const c_char{
+    let error_message = THREAD_LAST_ERROR.with(|e| {
+        e.borrow().as_ptr()
+    });
+    error_message
 }
 
 #[no_mangle]

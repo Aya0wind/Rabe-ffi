@@ -5,12 +5,12 @@
 use std::ffi::{c_char, CString};
 use std::ffi::{c_void,};
 use std::ptr::null;
+use rabe::RabeError;
 use rabe::schemes::ac17::{Ac17CpCiphertext, Ac17CpSecretKey, Ac17MasterKey, Ac17PublicKey, cp_decrypt, cp_encrypt, cp_keygen, setup};
 use rabe::utils::policy::pest::PolicyLanguage;
-
+use crate::common::THREAD_LAST_ERROR;
 use crate::common::*;
-use crate::{to_json_impl,free_impl,from_json_impl};
-
+use crate::{to_json_impl, free_impl, from_json_impl, set_last_error};
 #[repr(C)]
 pub struct Ac17SetupResult {
     pub master_key: *const c_void,
@@ -37,6 +37,7 @@ pub unsafe extern "C" fn rabe_cp_ac17_generate_secret_key(master_key: *const c_v
         if let Some(key) = key {
             Box::into_raw(Box::new(key)) as *const c_void
         } else {
+            set_last_error!("Failed to generate secret key");
             null()
         }
     } else {
@@ -57,12 +58,17 @@ pub unsafe extern "C" fn rabe_cp_ac17_encrypt(public_key: *const c_void, policy:
             PolicyLanguage::HumanPolicy,
         );
         std::mem::forget(policy);
-        if let Ok(cipher) = cipher {
-            Box::into_raw(Box::new(cipher)) as *const c_void
-        } else {
-            null()
+        match cipher {
+            Ok(cipher) => {
+                Box::into_raw(Box::new(cipher)) as *const c_void
+            }
+            Err(err) => {
+                set_last_error!(err);
+                null()
+            }
         }
     } else {
+        set_last_error!("Invalid public key");
         null()
     }
 }
@@ -74,12 +80,17 @@ pub unsafe extern "C" fn rabe_cp_ac17_decrypt(cipher: *const c_void, secret_key:
     let attr_key = (secret_key as *const Ac17CpSecretKey).as_ref();
     if let (Some(cipher), Some(attr_key)) = (cipher, attr_key) {
         let text = cp_decrypt(attr_key, cipher);
-        if let Ok(text) = text {
-            vec_u8_to_cboxedbuffer(text)
-        } else {
-            CBoxedBuffer::null()
+        match text {
+            Ok(text) => {
+                vec_u8_to_cboxedbuffer(text)
+            }
+            Err(err) => {
+                set_last_error!(err);
+                CBoxedBuffer::null()
+            }
         }
     } else {
+        set_last_error!("Invalid cipher or secret key");
         CBoxedBuffer::null()
     }
 }

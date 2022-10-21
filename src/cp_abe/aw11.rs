@@ -4,12 +4,13 @@
 use std::ffi::{c_char};
 use std::ffi::{c_void, CStr};
 use std::ptr::null;
-
+use rabe::RabeError;
 use rabe::schemes::aw11::{authgen, Aw11Ciphertext, Aw11GlobalKey, Aw11MasterKey, Aw11PublicKey, Aw11SecretKey, decrypt, encrypt, keygen, setup};
 use rabe::utils::policy::pest::PolicyLanguage;
-
+use std::ffi::CString;
+use crate::common::THREAD_LAST_ERROR;
 use crate::common::{CBoxedBuffer, cstring_array_to_string_vec, json_to_object_ptr, object_ptr_to_json, vec_u8_to_cboxedbuffer};
-use crate::{free_impl, from_json_impl, to_json_impl};
+use crate::{free_impl, from_json_impl, set_last_error, to_json_impl};
 
 #[repr(C)]
 pub struct Aw11AuthGenResult {
@@ -48,9 +49,11 @@ pub unsafe extern "C" fn rabe_cp_aw11_generate_auth(global_key: *const c_void,
                 public_key: Box::into_raw(Box::new(key.0)) as *const c_void,
             }
         } else {
+            set_last_error!("Failed to generate auth key");
             Default::default()
         }
     } else {
+        set_last_error!("Invalid global key");
         Default::default()
     }
 }
@@ -70,12 +73,16 @@ pub unsafe extern "C" fn rabe_cp_aw11_generate_secret_key(
         let name = CStr::from_ptr(name).to_string_lossy().to_string();
         let key = keygen(global_key, master_key, &name, &attrs);
         std::mem::forget(name);
-        if let Ok(key) = key {
-            Box::into_raw(Box::new(key)) as *const c_void
-        } else {
-            null()
+        match key {
+            Ok(key) => {Box::into_raw(Box::new(key)) as *const c_void}
+            Err(err) => {
+                set_last_error!(err);
+                null()
+            }
         }
+
     } else {
+        set_last_error!("Invalid global key or master key");
         null()
     }
 }
@@ -104,10 +111,12 @@ pub unsafe extern "C" fn rabe_cp_aw11_encrypt(
         );
         std::mem::forget(public_keys);
         std::mem::forget(policy);
-        if let Ok(cipher) = cipher {
-            Box::into_raw(Box::new(cipher)) as *const c_void
-        } else {
-            null()
+        match cipher {
+            Ok(cipher) => {Box::into_raw(Box::new(cipher)) as *const c_void}
+            Err(err) => {
+                set_last_error!(err);
+                null()
+            }
         }
     } else {
         null()
@@ -125,12 +134,15 @@ pub unsafe extern "C" fn rabe_cp_aw11_decrypt(
     let global_key = (global_key as *const Aw11GlobalKey).as_ref();
     if let (Some(global_key), Some(secret_key), Some(cipher)) = (global_key, attr_key, cipher) {
         let text = decrypt(global_key, secret_key, cipher);
-        if let Ok(text) = text {
-            vec_u8_to_cboxedbuffer(text)
-        } else {
-            CBoxedBuffer::null()
+        match text {
+            Ok(text) => {vec_u8_to_cboxedbuffer(text)}
+            Err(err) => {
+                set_last_error!(err);
+                Default::default()
+            }
         }
     } else {
+        set_last_error!("Invalid global key or secret key or cipher");
         CBoxedBuffer::null()
     }
 }

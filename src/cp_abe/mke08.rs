@@ -6,7 +6,8 @@ use std::ffi::{c_char, CString};
 use std::ffi::{c_void, CStr};
 use std::ptr::null;
 use libc::c_int;
-
+use rabe::RabeError;
+use crate::common::THREAD_LAST_ERROR;
 use rabe::schemes::mke08::{
     authgen,
     decrypt,
@@ -28,7 +29,7 @@ use rabe::schemes::mke08::{
 use rabe::utils::policy::pest::PolicyLanguage;
 
 use crate::common::{CBoxedBuffer, json_to_object_ptr, object_ptr_to_json, vec_u8_to_cboxedbuffer};
-use crate::{free_impl, from_json_impl, to_json_impl};
+use crate::{free_impl, from_json_impl, set_last_error, to_json_impl};
 
 #[repr(C)]
 pub struct Mke08SetupResult {
@@ -66,6 +67,7 @@ pub unsafe extern "C" fn rabe_cp_mke08_generate_user_key(
         let key = keygen(public_key, master_key, &name);
         Box::into_raw(Box::new(key)) as *const c_void
     } else {
+        set_last_error!("Invalid public or master key");
         null()
     }
 }
@@ -84,6 +86,7 @@ pub unsafe extern "C" fn rabe_cp_mke08_add_attribute_to_user_key(
             return 0;
         }
     }
+    set_last_error!("Invalid secret authority key");
     -1
 }
 
@@ -97,10 +100,17 @@ pub unsafe extern "C" fn rabe_cp_mke08_generate_public_attribute_key(
     let secret_authority_key = (secret_authority_key as *const Mke08SecretAuthorityKey).as_ref();
     if let (Some(public_key), Some(secret_authority_key)) = (public_key, secret_authority_key) {
         let attr = CStr::from_ptr(attr).to_string_lossy().to_string();
-        if let Ok(public_attr_user_key) = request_authority_pk(public_key,&attr, secret_authority_key){
-            return Box::into_raw(Box::new(public_attr_user_key)) as *const c_void;
+        match request_authority_pk(public_key,&attr, secret_authority_key){
+            Ok(public_attr_user_key) => {
+                return Box::into_raw(Box::new(public_attr_user_key)) as *const c_void;
+            }
+            Err(err) => {
+                set_last_error!(err);
+                return null();
+            }
         }
     }
+    set_last_error!("Invalid public key or secret authority key");
     null()
 }
 
@@ -134,12 +144,15 @@ pub unsafe extern "C" fn rabe_cp_mke08_encrypt(
         std::mem::forget(policy);
         let _ = Vec::from_raw_parts(public_attribute_keys.as_ptr() as *mut *const c_void, public_attribute_keys.len(), public_attribute_keys.capacity());
         std::mem::forget(public_attribute_keys);
-        if let Ok(cipher) = cipher {
-            Box::into_raw(Box::new(cipher)) as *const c_void
-        } else {
-            null()
+        match cipher {
+            Ok(cipher) => Box::into_raw(Box::new(cipher)) as *const c_void,
+            Err(err) => {
+                set_last_error!(err);
+                null()
+            }
         }
     } else {
+        set_last_error!("Invalid public key");
         null()
     }
 }
@@ -155,12 +168,15 @@ pub unsafe extern "C" fn rabe_cp_mke08_decrypt(
     let user_key = (user_key as *const Mke08UserKey).as_ref();
     if let (Some(cipher), Some(public_key), Some(user_key)) = (cipher, public_key, user_key) {
         let text = decrypt(public_key, user_key, cipher);
-        if let Ok(text) = text {
-            vec_u8_to_cboxedbuffer(text)
-        } else {
-            CBoxedBuffer::null()
+        match text {
+            Ok(text) => {vec_u8_to_cboxedbuffer(text)},
+            Err(err) => {
+                set_last_error!(err);
+                CBoxedBuffer::default()
+            }
         }
     } else {
+        set_last_error!("Invalid public key or user key");
         CBoxedBuffer::null()
     }
 }
