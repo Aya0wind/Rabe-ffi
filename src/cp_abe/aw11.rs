@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
 
+use std::cell::RefCell;
 use std::ffi::{c_char};
 use std::ffi::{c_void, CStr};
 use std::ptr::null;
