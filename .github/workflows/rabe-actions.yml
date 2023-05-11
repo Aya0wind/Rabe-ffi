@@ -14,16 +14,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
         include:
           - os: macos-latest
             target: x86_64-apple-darwin
-            suffix: ""
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            suffix: ""
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            suffix: ""
         rust: [nightly]
     steps:
       - uses: hecrj/setup-rust-action@v1
