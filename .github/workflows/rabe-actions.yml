@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest,macOS-latest]
         rust: [nightly]
     steps:
     - uses: hecrj/setup-rust-action@v1
@@ -25,5 +25,12 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - uses: actions/upload-artifact@v3
+      with:
+          name: librabe_ffi-${{ matrix.os }}
+          path: |
+             target/release/*rabe_ffi.*
+             rabe.h
+             !target/release/*.d
       env:
         CI: true
