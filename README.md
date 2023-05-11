@@ -12,6 +12,6 @@ Rust Attribute-Based Encryption library [rabe](https://github.com/Fraunhofer-AIS
 4. Add dynamic link library to your c project
    + ```cp target/release/librabe_ffi.so /your/project/path```
 5. Add bindings.h to your c project as a c header file  
-   + ```cp bindings.h /your/project/path/yourheadername.h```
+   + ```cp rabe.h /your/project/path/yourheadername.h```
 ## Documentation
 See unit tests in sources.
