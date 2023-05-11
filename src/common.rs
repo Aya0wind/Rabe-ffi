@@ -1,6 +1,6 @@
-use std::ffi::{c_char, c_uchar, c_void, CStr, CString};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::ffi::{c_char, c_uchar, c_void, CStr, CString};
 
 thread_local! {
      pub(crate) static THREAD_LAST_ERROR: std::cell::RefCell<CString> =std::cell::RefCell::new(Default::default());
@@ -13,7 +13,6 @@ macro_rules! set_last_error {
         });
     };
 }
-
 
 #[repr(C)]
 pub struct CBoxedBuffer {
@@ -41,9 +40,7 @@ pub(crate) unsafe fn object_ptr_to_json<T: Serialize>(ptr: *const c_void) -> *mu
     if let Some(value) = value {
         let json = serde_json::to_string(value);
         match json {
-            Ok(json) => {
-                CString::from_vec_unchecked(json.into_bytes()).into_raw()
-            }
+            Ok(json) => CString::from_vec_unchecked(json.into_bytes()).into_raw(),
             Err(err) => {
                 set_last_error!(err);
                 std::ptr::null_mut()
@@ -62,26 +59,32 @@ pub(crate) unsafe fn json_to_object_ptr<T: DeserializeOwned>(json: *const c_char
         Err(err) => {
             set_last_error!(err);
             std::ptr::null()
-        },
+        }
     }
 }
 
-pub(crate) unsafe fn cstring_array_to_string_vec(array: *const *const c_char, len: usize) -> Vec<String> {
-    (0..len).map(|index| {
-        let c_str_ptr = array.add(index).read();
-        CStr::from_ptr(c_str_ptr).to_string_lossy().to_string()
-    }).collect::<Vec<_>>()
+pub(crate) unsafe fn cstring_array_to_string_vec(
+    array: *const *const c_char,
+    len: usize,
+) -> Vec<String> {
+    (0..len)
+        .map(|index| {
+            let c_str_ptr = array.add(index).read();
+            CStr::from_ptr(c_str_ptr).to_string_lossy().to_string()
+        })
+        .collect::<Vec<_>>()
 }
-
 
 pub(crate) unsafe fn vec_u8_to_cboxedbuffer(mut array: Vec<u8>) -> CBoxedBuffer {
     array.shrink_to_fit();
     let len = array.len();
     let text_ptr = array.as_ptr();
     std::mem::forget(array);
-    CBoxedBuffer { buffer: text_ptr, len }
+    CBoxedBuffer {
+        buffer: text_ptr,
+        len,
+    }
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn rabe_free_json(json: *mut c_char) {
@@ -89,11 +92,8 @@ pub unsafe extern "C" fn rabe_free_json(json: *mut c_char) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_get_thread_last_error() -> *const c_char{
-    let error_message = THREAD_LAST_ERROR.with(|e| {
-        e.borrow().as_ptr()
-    });
-    error_message
+pub unsafe extern "C" fn rabe_get_thread_last_error() -> *const c_char {
+    THREAD_LAST_ERROR.with(|e| e.borrow().as_ptr())
 }
 
 #[no_mangle]

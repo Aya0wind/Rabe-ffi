@@ -1,22 +1,23 @@
 #![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
 
-#[allow(unused_imports)]
-use std::ffi::{c_char, CString};
-use std::ffi::{c_void,};
-use std::ptr::null;
-use rabe::RabeError;
-use rabe::schemes::ac17::{Ac17CpCiphertext, Ac17CpSecretKey, Ac17MasterKey, Ac17PublicKey, cp_decrypt, cp_encrypt, cp_keygen, setup};
-use rabe::utils::policy::pest::PolicyLanguage;
 use crate::common::THREAD_LAST_ERROR;
 use crate::common::*;
-use crate::{to_json_impl, free_impl, from_json_impl, set_last_error};
+use crate::{free_impl, from_json_impl, set_last_error, to_json_impl};
+use rabe::schemes::ac17::{
+    cp_decrypt, cp_encrypt, cp_keygen, setup, Ac17CpCiphertext, Ac17CpSecretKey, Ac17MasterKey,
+    Ac17PublicKey,
+};
+use rabe::utils::policy::pest::PolicyLanguage;
+use std::ffi::c_void;
+#[allow(unused_imports)]
+use std::ffi::{c_char, CString};
+use std::ptr::null;
 #[repr(C)]
 pub struct Ac17SetupResult {
     pub master_key: *const c_void,
     pub public_key: *const c_void,
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn rabe_ac17_init() -> Ac17SetupResult {
@@ -27,9 +28,12 @@ pub unsafe extern "C" fn rabe_ac17_init() -> Ac17SetupResult {
     }
 }
 
-
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_ac17_generate_secret_key(master_key: *const c_void, attr: *const *const c_char, attr_len: usize) -> *const c_void {
+pub unsafe extern "C" fn rabe_cp_ac17_generate_secret_key(
+    master_key: *const c_void,
+    attr: *const *const c_char,
+    attr_len: usize,
+) -> *const c_void {
     let master_key = (master_key as *const Ac17MasterKey).as_ref();
     if let Some(master_key) = master_key {
         let attrs = cstring_array_to_string_vec(attr, attr_len);
@@ -46,7 +50,12 @@ pub unsafe extern "C" fn rabe_cp_ac17_generate_secret_key(master_key: *const c_v
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_ac17_encrypt(public_key: *const c_void, policy: *const c_char, text: *const c_char, text_length: usize) -> *const c_void {
+pub unsafe extern "C" fn rabe_cp_ac17_encrypt(
+    public_key: *const c_void,
+    policy: *const c_char,
+    text: *const c_char,
+    text_length: usize,
+) -> *const c_void {
     let public_key = (public_key as *const Ac17PublicKey).as_ref();
     if let Some(public_key) = public_key {
         let policy_len = libc::strlen(policy);
@@ -59,9 +68,7 @@ pub unsafe extern "C" fn rabe_cp_ac17_encrypt(public_key: *const c_void, policy:
         );
         std::mem::forget(policy);
         match cipher {
-            Ok(cipher) => {
-                Box::into_raw(Box::new(cipher)) as *const c_void
-            }
+            Ok(cipher) => Box::into_raw(Box::new(cipher)) as *const c_void,
             Err(err) => {
                 set_last_error!(err);
                 null()
@@ -73,17 +80,17 @@ pub unsafe extern "C" fn rabe_cp_ac17_encrypt(public_key: *const c_void, policy:
     }
 }
 
-
 #[no_mangle]
-pub unsafe extern "C" fn rabe_cp_ac17_decrypt(cipher: *const c_void, secret_key: *const c_void) -> CBoxedBuffer {
+pub unsafe extern "C" fn rabe_cp_ac17_decrypt(
+    cipher: *const c_void,
+    secret_key: *const c_void,
+) -> CBoxedBuffer {
     let cipher = (cipher as *const Ac17CpCiphertext).as_ref();
     let attr_key = (secret_key as *const Ac17CpSecretKey).as_ref();
     if let (Some(cipher), Some(attr_key)) = (cipher, attr_key) {
         let text = cp_decrypt(attr_key, cipher);
         match text {
-            Ok(text) => {
-                vec_u8_to_cboxedbuffer(text)
-            }
+            Ok(text) => vec_u8_to_cboxedbuffer(text),
             Err(err) => {
                 set_last_error!(err);
                 CBoxedBuffer::null()
@@ -95,34 +102,36 @@ pub unsafe extern "C" fn rabe_cp_ac17_decrypt(cipher: *const c_void, secret_key:
     }
 }
 
-to_json_impl!{
+to_json_impl! {
     rabe_ac17_master_key_to_json,Ac17MasterKey,
     rabe_ac17_public_key_to_json,Ac17PublicKey,
     rabe_cp_ac17_secret_key_to_json,Ac17CpSecretKey,
     rabe_cp_ac17_cipher_to_json,Ac17CpCiphertext
 }
-from_json_impl!{
+from_json_impl! {
     rabe_ac17_master_key_from_json,Ac17MasterKey,
     rabe_ac17_public_key_from_json,Ac17PublicKey,
     rabe_cp_ac17_secret_key_from_json,Ac17CpSecretKey,
     rabe_cp_ac17_cipher_from_json,Ac17CpCiphertext
 }
 
-free_impl!{
+free_impl! {
     rabe_ac17_free_master_key,Ac17MasterKey,
     rabe_ac17_free_public_key,Ac17PublicKey,
     rabe_cp_ac17_free_secret_key,Ac17CpSecretKey,
     rabe_cp_ac17_free_cipher,Ac17CpCiphertext
 }
 
-
-
 #[cfg(test)]
 mod test {
     use std::ffi::CString;
 
     use crate::common::{rabe_free_boxed_buffer, rabe_free_json};
-    use crate::cp_abe::ac17::{rabe_ac17_free_master_key, rabe_ac17_free_public_key, rabe_ac17_init, rabe_ac17_public_key_to_json, rabe_cp_ac17_free_cipher, rabe_cp_ac17_generate_secret_key, rabe_cp_ac17_secret_key_to_json};
+    use crate::cp_abe::ac17::{
+        rabe_ac17_free_master_key, rabe_ac17_free_public_key, rabe_ac17_init,
+        rabe_ac17_public_key_to_json, rabe_cp_ac17_free_cipher, rabe_cp_ac17_generate_secret_key,
+        rabe_cp_ac17_secret_key_to_json,
+    };
 
     use super::{rabe_cp_ac17_cipher_to_json, rabe_cp_ac17_decrypt, rabe_cp_ac17_encrypt};
 
@@ -136,18 +145,24 @@ mod test {
             assert!(!master_key.is_null());
             let attr = vec![CString::new("a").unwrap(), CString::new("b").unwrap()];
             let attr_ptr = attr.iter().map(|s| s.as_ptr()).collect::<Vec<_>>();
-            let secret_key = rabe_cp_ac17_generate_secret_key(master_key, attr_ptr.as_ptr(), attr.len());
+            let secret_key =
+                rabe_cp_ac17_generate_secret_key(master_key, attr_ptr.as_ptr(), attr.len());
             assert!(!secret_key.is_null());
             let policy = CString::new("\"a\" and \"b\"").unwrap();
             let text = CString::new("hello world").unwrap();
-            let cipher = rabe_cp_ac17_encrypt(public_key,
-                                              policy.as_ptr(),
-                                              text.as_ptr(),
-                                              "hello world".len());
+            let cipher = rabe_cp_ac17_encrypt(
+                public_key,
+                policy.as_ptr(),
+                text.as_ptr(),
+                "hello world".len(),
+            );
             assert!(!cipher.is_null());
             let result = rabe_cp_ac17_decrypt(cipher, secret_key);
             assert!(!result.buffer.is_null());
-            assert_eq!(std::slice::from_raw_parts(result.buffer, result.len), "hello world".as_bytes());
+            assert_eq!(
+                std::slice::from_raw_parts(result.buffer, result.len),
+                "hello world".as_bytes()
+            );
 
             let json = rabe_cp_ac17_secret_key_to_json(secret_key);
             println!("{}", std::ffi::CStr::from_ptr(json).to_str().unwrap());
