@@ -14,7 +14,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: ""
         rust: [nightly]
     steps:
       - uses: hecrj/setup-rust-action@v1
@@ -22,20 +31,18 @@ jobs:
           rust-version: ${{ matrix.rust }}
       - uses: actions/checkout@main
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --release
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --release
       - uses: actions/upload-artifact@v3
         with:
-          name: rabe-ffi-${{ matrix.os }}
+          name: rabe-ffi-${{ matrix.target }}
           path: |
-            target/release/*.lib
-            target/release/*.so
-            target/release/*.dylib
-            target/release/*.dll
-            target/release/*.pdb
-            target/release/*.exp
-            target/release/*.a
-            rabe.h
-        env:
-          CI: true
+            ./target/release/*.lib
+            ./target/release/*.so
+            ./target/release/*.dylib
+            ./target/release/*.dll
+            ./target/release/*.pdb
+            ./target/release/*.exp
+            ./target/release/*.a
+            ./rabe.h
