@@ -2,35 +2,40 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
-  
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest,macOS-latest]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
         rust: [nightly]
     steps:
-    - uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: ${{ matrix.rust }}
-    - uses: actions/checkout@main
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - uses: actions/upload-artifact@v3
-      with:
-          name: librabe_ffi-${{ matrix.os }}
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: ${{ matrix.rust }}
+      - uses: actions/checkout@main
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
+      - uses: actions/upload-artifact@v3
+        with:
+          name: rabe-ffi-${{ matrix.os }}
           path: |
-             target/release/*rabe_ffi.*
-             rabe.h
-             !target/release/*.d
-      env:
-        CI: true
+            target/release/*.lib
+            target/release/*.so
+            target/release/*.dylib
+            target/release/*.dll
+            target/release/*.pdb
+            target/release/*.exp
+            target/release/*.a
+            rabe.h
+        env:
+          CI: true

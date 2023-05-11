@@ -373,7 +373,7 @@ mod test {
             let result = rabe_cp_bdabe_decrypt(public_key, user_key, cipher);
             assert!(!result.buffer.is_null());
             assert_eq!(
-                std::slice::from_raw_parts(result.buffer, result.len),
+                std::slice::from_raw_parts(result.buffer, result.len as usize),
                 "our plaintext!".as_bytes()
             );
             rabe_free_boxed_buffer(result);

@@ -222,7 +222,7 @@ mod test {
             let result = rabe_cp_aw11_decrypt(global_key, secret_key, cipher);
             assert!(!result.buffer.is_null());
             assert_eq!(
-                std::slice::from_raw_parts(result.buffer, result.len),
+                std::slice::from_raw_parts(result.buffer, result.len as usize),
                 "hello world".as_bytes()
             );
 

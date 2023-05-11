@@ -1,15 +1,15 @@
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::ffi::{c_char, c_uchar, c_void, CStr, CString};
+use std::ffi::{c_char, c_uchar, c_uint, c_void, CStr, CString};
 
 thread_local! {
-     pub(crate) static THREAD_LAST_ERROR: std::cell::RefCell<CString> =std::cell::RefCell::new(Default::default());
+     pub(crate) static THREAD_LAST_ERROR: std::cell::Cell<CString> =std::cell::Cell::new(Default::default());
 }
 #[macro_export]
 macro_rules! set_last_error {
     ($msg:expr) => {
         THREAD_LAST_ERROR.with(|e| {
-            *e.borrow_mut() = CString::from_vec_unchecked(($msg.to_string().into_bytes()));
+            e.set(CString::from_vec_unchecked(($msg.to_string().into_bytes())));
         });
     };
 }
@@ -17,7 +17,7 @@ macro_rules! set_last_error {
 #[repr(C)]
 pub struct CBoxedBuffer {
     pub(crate) buffer: *const c_uchar,
-    pub(crate) len: usize,
+    pub(crate) len: c_uint,
 }
 
 impl Default for CBoxedBuffer {
@@ -77,7 +77,7 @@ pub(crate) unsafe fn cstring_array_to_string_vec(
 
 pub(crate) unsafe fn vec_u8_to_cboxedbuffer(mut array: Vec<u8>) -> CBoxedBuffer {
     array.shrink_to_fit();
-    let len = array.len();
+    let len = array.len() as c_uint;
     let text_ptr = array.as_ptr();
     std::mem::forget(array);
     CBoxedBuffer {
@@ -93,12 +93,20 @@ pub unsafe extern "C" fn rabe_free_json(json: *mut c_char) {
 
 #[no_mangle]
 pub unsafe extern "C" fn rabe_get_thread_last_error() -> *const c_char {
-    THREAD_LAST_ERROR.with(|e| e.borrow().as_ptr())
+    THREAD_LAST_ERROR.with(|e| {
+        let error_msg = e.take();
+        e.set(error_msg.clone());
+        error_msg.into_raw()
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn rabe_free_boxed_buffer(result: CBoxedBuffer) {
-    let _ = Vec::from_raw_parts(result.buffer as *mut u8, result.len, result.len);
+    let _ = Vec::from_raw_parts(
+        result.buffer as *mut u8,
+        result.len as usize,
+        result.len as usize,
+    );
 }
 
 #[macro_export]

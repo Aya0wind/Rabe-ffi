@@ -5,7 +5,7 @@
 
 typedef struct CBoxedBuffer {
   const unsigned char *buffer;
-  uintptr_t len;
+  unsigned int len;
 } CBoxedBuffer;
 
 typedef struct Ac17SetupResult {
@@ -55,12 +55,11 @@ const void *rabe_cp_ac17_generate_secret_key(const void *master_key,
                                              const char *const *attr,
                                              uintptr_t attr_len);
 
-const void *rabe_cp_ac17_encrypt(const void *public_key,
-                                 const char *policy,
-                                 const char *text,
-                                 uintptr_t text_length);
+const void *rabe_cp_ac17_encrypt(const void *public_key, const char *policy,
+                                 const char *text, uintptr_t text_length);
 
-struct CBoxedBuffer rabe_cp_ac17_decrypt(const void *cipher, const void *secret_key);
+struct CBoxedBuffer rabe_cp_ac17_decrypt(const void *cipher,
+                                         const void *secret_key);
 
 char *rabe_ac17_master_key_to_json(const void *ptr);
 
@@ -100,10 +99,8 @@ const void *rabe_cp_aw11_generate_secret_key(const void *global_key,
 
 const void *rabe_cp_aw11_encrypt(const void *global_key,
                                  const void *const *public_keys,
-                                 uintptr_t public_keys_len,
-                                 const char *policy,
-                                 const char *text,
-                                 uintptr_t text_length);
+                                 uintptr_t public_keys_len, const char *policy,
+                                 const char *text, uintptr_t text_length);
 
 struct CBoxedBuffer rabe_cp_aw11_decrypt(const void *global_key,
                                          const void *secret_key,
@@ -145,17 +142,17 @@ const void *rabe_cp_bdabe_generate_secret_authority_key(const void *public_key,
                                                         const void *master_key,
                                                         const char *name);
 
-const void *rabe_cp_bdabe_generate_secret_attribute_key(const void *public_user_key,
-                                                        const void *secret_authority_key,
-                                                        const char *attr);
+const void *
+rabe_cp_bdabe_generate_secret_attribute_key(const void *public_user_key,
+                                            const void *secret_authority_key,
+                                            const char *attr);
 
 const void *rabe_cp_bdabe_generate_user_key(const void *public_key,
                                             const void *secret_authority_key,
                                             const char *name);
 
-const void *rabe_cp_bdabe_generate_public_attribute_key(const void *public_key,
-                                                        const void *secret_authority_key,
-                                                        const char *name);
+const void *rabe_cp_bdabe_generate_public_attribute_key(
+    const void *public_key, const void *secret_authority_key, const char *name);
 
 int rabe_cp_bdabe_add_attribute_to_user_key(const void *secret_authority_key,
                                             const void *user_key,
@@ -164,8 +161,7 @@ int rabe_cp_bdabe_add_attribute_to_user_key(const void *secret_authority_key,
 const void *rabe_cp_bdabe_encrypt(const void *public_key,
                                   const void *const *public_attribute_keys,
                                   uintptr_t public_attribute_keys_len,
-                                  const char *policy,
-                                  const char *text,
+                                  const char *policy, const char *text,
                                   uintptr_t text_length);
 
 struct CBoxedBuffer rabe_cp_bdabe_decrypt(const void *public_key,
@@ -233,12 +229,11 @@ const void *rabe_cp_bsw_generate_secret_key(const void *public_key,
                                             const char *const *attr,
                                             uintptr_t attr_len);
 
-const void *rabe_cp_bsw_encrypt(const void *public_key,
-                                const char *policy,
-                                const char *text,
-                                uintptr_t text_length);
+const void *rabe_cp_bsw_encrypt(const void *public_key, const char *policy,
+                                const char *text, uintptr_t text_length);
 
-struct CBoxedBuffer rabe_cp_bsw_decrypt(const void *cipher, const void *secret_key);
+struct CBoxedBuffer rabe_cp_bsw_decrypt(const void *cipher,
+                                        const void *secret_key);
 
 const void *rabe_cp_bsw_secret_key_from_json(const char *json);
 
@@ -276,15 +271,13 @@ int rabe_cp_mke08_add_attribute_to_user_key(const void *secret_authority_key,
                                             const void *user_key,
                                             const char *attr);
 
-const void *rabe_cp_mke08_generate_public_attribute_key(const void *public_key,
-                                                        const char *attr,
-                                                        const void *secret_authority_key);
+const void *rabe_cp_mke08_generate_public_attribute_key(
+    const void *public_key, const char *attr, const void *secret_authority_key);
 
 const void *rabe_cp_mke08_encrypt(const void *public_key,
                                   const void *const *public_attribute_keys,
                                   uintptr_t public_attribute_keys_len,
-                                  const char *policy,
-                                  const char *text,
+                                  const char *policy, const char *text,
                                   uintptr_t text_length);
 
 struct CBoxedBuffer rabe_cp_mke08_decrypt(const void *public_key,
@@ -345,15 +338,15 @@ void rabe_cp_mke08_free_user_key(const void *ptr);
 
 void rabe_cp_mke08_free_ciphertext(const void *ptr);
 
-const void *rabe_kp_ac17_generate_secret_key(const void *master_key, const char *policy);
+const void *rabe_kp_ac17_generate_secret_key(const void *master_key,
+                                             const char *policy);
 
 const void *rabe_kp_ac17_encrypt(const void *public_key,
-                                 const char *const *attr,
-                                 uintptr_t attr_len,
-                                 const char *text,
-                                 uintptr_t text_length);
+                                 const char *const *attr, uintptr_t attr_len,
+                                 const char *text, uintptr_t text_length);
 
-struct CBoxedBuffer rabe_kp_ac17_decrypt(const void *cipher, const void *secret_key);
+struct CBoxedBuffer rabe_kp_ac17_decrypt(const void *cipher,
+                                         const void *secret_key);
 
 char *rabe_kp_ac17_master_key_to_json(const void *ptr);
 
@@ -379,19 +372,19 @@ void rabe_kp_ac17_free_secret_key(const void *ptr);
 
 void rabe_kp_ac17_free_ciphertext(const void *ptr);
 
-struct Yct14AbeSetupResult rabe_kp_yct14_init(const char *const *attrs, uintptr_t attr_len);
+struct Yct14AbeSetupResult rabe_kp_yct14_init(const char *const *attrs,
+                                              uintptr_t attr_len);
 
 const void *rabe_kp_yct14_generate_secret_key(const void *public_key,
                                               const void *master_key,
                                               const char *policy);
 
 const void *rabe_kp_yct14_encrypt(const void *public_key,
-                                  const char *const *attrs,
-                                  uintptr_t attr_len,
-                                  const char *text,
-                                  uintptr_t text_length);
+                                  const char *const *attrs, uintptr_t attr_len,
+                                  const char *text, uintptr_t text_length);
 
-struct CBoxedBuffer rabe_kp_yct14_decrypt(const void *cipher, const void *secret_key);
+struct CBoxedBuffer rabe_kp_yct14_decrypt(const void *cipher,
+                                          const void *secret_key);
 
 char *rabe_kp_yct14_ciphertext_to_json(const void *ptr);
 
@@ -424,12 +417,11 @@ const void *rabe_kp_lsw_generate_secret_key(const void *public_key,
                                             const char *policy);
 
 const void *rabe_kp_lsw_encrypt(const void *public_key,
-                                const char *const *attrs,
-                                uintptr_t attr_len,
-                                const char *text,
-                                uintptr_t text_length);
+                                const char *const *attrs, uintptr_t attr_len,
+                                const char *text, uintptr_t text_length);
 
-struct CBoxedBuffer rabe_kp_lsw_decrypt(const void *cipher, const void *secret_key);
+struct CBoxedBuffer rabe_kp_lsw_decrypt(const void *cipher,
+                                        const void *secret_key);
 
 char *rabe_kp_lsw_master_key_to_json(const void *ptr);
 
